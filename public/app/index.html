@@ -751,6 +751,18 @@ function todoRow(x){
 function itemRow(name,x,check){
   return '<div class="item">'+(check?'<input type="checkbox" data-todo="'+esc(x.id)+'"'+(x.done?" checked":"")+'>':"")+'<span class="t'+(x.done?" done":"")+'">'+esc(x.text||"")+'</span><button type="button" class="x" data-del="'+name+':'+esc(x.id)+'" aria-label="Löschen">✕</button></div>';
 }
+var pushSt="",pushMsg="";
+function pushHtml(){
+  var h='<div class="note" style="margin-top:12px"><b>Push-Nachrichten</b><br>';
+  if(pushSt==="on") h+='Aktiv auf diesem Gerät. Fällige Erinnerungen kommen auch bei geschlossener App.<div style="margin-top:8px"><button type="button" data-push="test">Test senden</button> <button type="button" data-push="off">Ausschalten</button></div>';
+  else if(pushSt==="off") h+='Damit Erinnerungen auch bei geschlossener App ankommen.<div style="margin-top:8px"><button type="button" data-push="on">Push-Nachrichten aktivieren</button></div>';
+  else if(pushSt==="install") h+='Auf dem iPad geht das nur in der installierten App: Teilen-Symbol, „Zum Home-Bildschirm“, dann von dort öffnen.';
+  else if(pushSt==="denied") h+='Benachrichtigungen sind für diese Seite blockiert. Erlaube sie in den Geräteeinstellungen.';
+  else if(pushSt==="unsupported") h+='Dieser Browser unterstützt keine Push-Nachrichten.';
+  else h+='Prüfe …';
+  if(pushMsg) h+='<div style="margin-top:8px">'+esc(pushMsg)+'</div>';
+  return h+'</div>';
+}
 function todoHtml(){
   var open=lists.todos.filter(function(x){return !x.done}),done=lists.todos.filter(function(x){return x.done});
   var anyDraft=draft.r.some(function(r){return r.at||r.m});
@@ -762,7 +774,7 @@ function todoHtml(){
       +'<input type="datetime-local" data-d="at:'+i+'" value="'+esc(r.at)+'" aria-label="Zeitpunkt '+LVN[i]+'">'
       +'<input type="text" data-d="m:'+i+'" maxlength="120" placeholder="Nachricht (optional)" value="'+esc(r.m)+'" autocomplete="off"></div>'}).join("")+'</details>'
     +'<div style="margin-top:10px"><button type="button" data-add="todos">Hinzufügen</button></div>'
-    +(("Notification" in window&&Notification.permission==="default")?'<div class="note" style="margin-top:10px">Optional: <button type="button" data-notif="1">Browser-Benachrichtigungen erlauben</button><br>Sie erscheinen nur, solange die Seite geöffnet ist.</div>':'')
+    +pushHtml()
     +'</div><div class="card">'
     +(open.length?open.map(todoRow).join(""):'<div class="note">Keine offenen Aufgaben.</div>')+'</div>';
   if(done.length) h+='<details class="card"><summary><b>Erledigt ('+done.length+')</b></summary>'+done.map(todoRow).join("")+'<div style="margin-top:10px"><button type="button" data-clear="todos">Erledigte löschen</button></div></details>';
@@ -874,7 +886,13 @@ $("#app").addEventListener("click",function(e){
   if(b.dataset.tab){tab=b.dataset.tab;render()}
   else if(b.dataset.nav){var n=sel+parseInt(b.dataset.nav,10);if(n>=0&&n<days.length){sel=n;render()}}
   else if(b.dataset.suggest){runSuggest()}
-  else if(b.dataset.notif){try{Notification.requestPermission().then(function(){render()})}catch(e){}}
+  else if(b.dataset.push){
+    var act=b.dataset.push,P=window.epPush;if(!P)return;pushMsg="";
+    if(act==="on")P.enable().then(function(s){pushSt=s;render()}).catch(function(e){pushMsg="Das hat nicht geklappt: "+(e&&e.message||"Fehler");render()});
+    else if(act==="off")P.disable().then(function(s){pushSt=s;render()}).catch(function(){render()});
+    else if(act==="test")P.test().then(function(r){pushMsg=r&&r.ok?"Test gesendet. Er sollte gleich ankommen.":"Der Test konnte nicht zugestellt werden.";render()}).catch(function(e){pushMsg=(e&&e.message)||"Fehler";render()});
+    render();
+  }
   else if(b.dataset.add){
     var nm=b.dataset.add;
     if(nm==="todos"){
@@ -930,9 +948,6 @@ function tick(){
       var t=parseAt(r&&r.at),key=x.id+"#"+i+"#"+r.at;
       if(isNaN(t)||t>now||f[key])return;
       f[key]=1;ch=true;
-      if(now-t<6*3600*1000&&"Notification" in window&&Notification.permission==="granted"){
-        try{new Notification(LV[i]+" "+(x.text||"Erinnerung"),{body:r.m||x.note||""})}catch(e){}
-      }
     });
   });
   if(ch){try{localStorage.setItem("ep_fired",JSON.stringify(f))}catch(e){}}
@@ -942,6 +957,7 @@ setInterval(tick,30000);
 days=emptyDays();
 render();
 initStore().then(function(){render()});
+try{if(window.epPush)window.epPush.status().then(function(s){pushSt=s;if(tab==="todo")render()})}catch(e){}
 try{window.claude.use("sample").then(function(x){if(x){hasSample=true;render()}})}catch(e){}
 if(restoreCache())render();else load();
 })();

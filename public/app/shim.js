@@ -162,6 +162,46 @@
     }
   };
 
+
+  /* ---------- Push ---------- */
+  function standalone() { return (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true; }
+  function isIOS() { return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); }
+  function keyBytes(b64) {
+    var p = b64.replace(/-/g, "+").replace(/_/g, "/"); while (p.length % 4) p += "=";
+    var raw = atob(p), out = new Uint8Array(raw.length); for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i); return out;
+  }
+  window.epPush = {
+    status: function () {
+      if (isIOS() && !standalone()) return Promise.resolve("install");
+      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return Promise.resolve("unsupported");
+      if (Notification.permission === "denied") return Promise.resolve("denied");
+      return navigator.serviceWorker.getRegistration().then(function (reg) { return reg ? reg.pushManager.getSubscription() : null; })
+        .then(function (sub) { return sub && Notification.permission === "granted" ? "on" : "off"; }).catch(function () { return "off"; });
+    },
+    enable: function () {
+      return ready().then(function () { return Notification.requestPermission(); }).then(function (perm) {
+        if (perm !== "granted") return "denied";
+        return navigator.serviceWorker.register("sw.js").then(function () { return navigator.serviceWorker.ready; }).then(function (reg) {
+          return jfetch("/api/push/key", { headers: hdr() }).then(function (k) {
+            return reg.pushManager.getSubscription().then(function (old) { return old ? old.unsubscribe() : true; }).then(function () {
+              return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(k.publicKey) });
+            });
+          });
+        }).then(function (sub) {
+          return jfetch("/api/push/subscribe", { method: "POST", headers: hdr(), body: JSON.stringify({ subscription: sub.toJSON(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone }) });
+        }).then(function () { return "on"; });
+      });
+    },
+    disable: function () {
+      return navigator.serviceWorker.getRegistration().then(function (reg) { return reg ? reg.pushManager.getSubscription() : null; }).then(function (sub) {
+        if (!sub) return "off";
+        var ep = sub.endpoint;
+        return sub.unsubscribe().then(function () { return jfetch("/api/push/unsubscribe", { method: "POST", headers: hdr(), body: JSON.stringify({ endpoint: ep }) }); }).then(function () { return "off"; });
+      });
+    },
+    test: function () { return jfetch("/api/push/test", { method: "POST", headers: hdr(), body: "{}" }); }
+  };
+
   window.claude = {
     use: function (name) {
       if (name === "mcp") return ready().then(function () { return mcp; });
