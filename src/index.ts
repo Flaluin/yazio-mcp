@@ -14,6 +14,7 @@
 
 import { createMcpHandler, type McpHttpHandler } from "@modelcontextprotocol/server";
 
+import { handleAppRequest } from "./app";
 import { allow, tokenKey, tooManyRequests, type Env } from "./limits";
 import { createServer } from "./mcp";
 import {
@@ -61,6 +62,9 @@ export default {
     if (url.pathname === "/health" && request.method === "GET") {
       return Response.json({ status: "ok", mcp_endpoint: publicMcpUrl(request).toString() });
     }
+
+    const app = await handleAppRequest(request, env);
+    if (app) return app;
 
     const oauth = await handleOAuthRequest(request, env);
     if (oauth) return oauth;

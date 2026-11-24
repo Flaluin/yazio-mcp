@@ -26,6 +26,8 @@ export interface Env {
   TOKEN_LIMIT?: RateLimit;
   /** The MCP endpoint, keyed by session. */
   MCP_LIMIT?: RateLimit;
+  /** Shared store of the dashboard app (ticks, to-dos, ideas). */
+  APP_KV?: KVNamespace;
 }
 
 /** Every caller Cloudflare gave no IP for shares this one, rather than a key of "". */
