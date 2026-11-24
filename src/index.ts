@@ -15,6 +15,7 @@
 import { createMcpHandler, type McpHttpHandler } from "@modelcontextprotocol/server";
 
 import { handleAppRequest } from "./app";
+import { runDue } from "./push";
 import { allow, tokenKey, tooManyRequests, type Env } from "./limits";
 import { createServer } from "./mcp";
 import {
@@ -56,6 +57,10 @@ const handler: McpHttpHandler = createMcpHandler((ctx) => {
 });
 
 export default {
+  scheduled(_event, env, ctx) {
+    ctx.waitUntil(runDue(env));
+  },
+
   async fetch(request, env) {
     const url = new URL(request.url);
 

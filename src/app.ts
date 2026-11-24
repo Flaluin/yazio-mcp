@@ -21,6 +21,7 @@ import { formatDaySummary, formatGoals, formatNutrientHistory, formatRangeSummar
 import { allow, clientIp, RETRY_AFTER_HEADERS, tokenKey, type Env } from "./limits";
 import { decodeSession, encodeSession, offsetMinutes, sha256Base64Url, type Session } from "./session";
 import { getUser, login, YazioApiError, YazioShapeError } from "./yazio/api";
+import { handlePush } from "./push";
 import { NUTRIENTS, YazioService } from "./yazio/service";
 
 const MAX_RANGE_DAYS = 31;
@@ -248,6 +249,18 @@ async function handleDb(request: Request, env: Env, rest: string[]): Promise<Res
   return fail(405, "method", "Nicht erlaubt.");
 }
 
+async function handlePushRoute(request: Request, env: Env, rest: string[]): Promise<Response> {
+  const ns = await namespaceOf(request);
+  if (!ns) {
+    return fail(401, "passphrase", `Die Passphrase braucht mindestens ${MIN_PASSPHRASE} Zeichen.`);
+  }
+  if (!(await allow(env.MCP_LIMIT, `push:${ns}`))) {
+    return json({ error: "rate_limited", message: "Zu viele Anfragen." }, 429, RETRY_AFTER_HEADERS);
+  }
+  const body = request.method === "POST" ? await readJson(request) : null;
+  return handlePush(request, env, ns, rest, body);
+}
+
 // --- entry -------------------------------------------------------------------
 
 /** Handle `/api/*`. Resolves to `undefined` for any other path. */
@@ -263,6 +276,8 @@ export async function handleAppRequest(request: Request, env: Env): Promise<Resp
       return handleCall(request, env);
     case "db":
       return handleDb(request, env, parts.slice(1));
+    case "push":
+      return handlePushRoute(request, env, parts.slice(1));
     case "health":
       return json({ status: "ok" });
     default:
