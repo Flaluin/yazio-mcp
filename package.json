@@ -12,6 +12,7 @@
     "lint": "prettier . --ignore-path .gitignore --write --log-level warn && eslint . --fix && tsc --pretty && knip --no-progress"
   },
   "dependencies": {
+    "@block65/webcrypto-web-push": "^2.0.0",
     "@modelcontextprotocol/server": "^2.0.0",
     "zod": "^4.1.13"
   },

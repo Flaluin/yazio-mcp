@@ -13,6 +13,9 @@
   "assets": { "directory": "./public" },
   "kv_namespaces": [{ "binding": "APP_KV" }],
 
+  // Jede Minute nach fälligen To-do-Erinnerungen schauen (Push-Nachrichten).
+  "triggers": { "crons": ["* * * * *"] },
+
   // Rate limiters. Nothing to provision — a namespace id is just a number this
   // Worker picks — so the deploy button still asks for nothing. Counting is
   // per-colo and the window is 60s, so these are a ceiling on abuse rather than
