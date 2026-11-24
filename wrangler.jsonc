@@ -8,6 +8,11 @@
     "enabled": false,
   },
 
+  // Dashboard app: static files from ./public (served at /app) and a small
+  // shared store. The KV namespace is created on the first deploy.
+  "assets": { "directory": "./public" },
+  "kv_namespaces": [{ "binding": "APP_KV" }],
+
   // Rate limiters. Nothing to provision — a namespace id is just a number this
   // Worker picks — so the deploy button still asks for nothing. Counting is
   // per-colo and the window is 60s, so these are a ceiling on abuse rather than
